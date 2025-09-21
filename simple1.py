@@ -4,6 +4,7 @@ import numpy as np
 # Простой Трансформер на numpy
 # -------------------------------
 
+
 # Функция позиционного кодирования (Position Encoding)
 def positional_encoding(seq_len, d_model):
     """
@@ -17,9 +18,11 @@ def positional_encoding(seq_len, d_model):
 
     # Чередуем синус и косинус
     pos_encoding = np.zeros((seq_len, d_model))
+    
     pos_encoding[:, 0::2] = np.sin(angle_rads[:, 0::2])
     pos_encoding[:, 1::2] = np.cos(angle_rads[:, 1::2])
     return pos_encoding
+
 
 # Функция "Scaled Dot-Product Attention"
 def scaled_dot_product_attention(Q, K, V):
@@ -125,6 +128,8 @@ transformer = SimpleTransformer(seq_len, d_model, d_ff, num_layers)
 output = transformer.encode(x)
 
 print("Входная последовательность:")
-print(seq)
-print("\nВыход Трансформера (после 2 слоев):")
+print(seq) 
+print("\n Выход Трансформера (после 2 слоев):")
 print(output)
+
+

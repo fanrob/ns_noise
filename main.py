@@ -6,7 +6,7 @@ import torch.optim as optim
 import math
 
 import pandas as pd
-import matplotlib.pyplot as plt
+
 import time
 
 # Загрузка данных из CSV
