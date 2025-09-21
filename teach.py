@@ -1,13 +1,10 @@
-import numpy as np
 import torch
-
 import torch.nn as nn
-import torch.optim as optim
 import math
 
 import pandas as pd
-
 import time
+import matplotlib.pyplot as plt
 
 # Загрузка данных из CSV
 # def load_data(file_path):
@@ -37,15 +34,18 @@ print("")
 
 
 # === Параметры ===
-SEQ_LEN = 30       # длина входной последовательности
-PRED_LEN = 10      # сколько шагов предсказывать
-MODEL_DIM = 64  # размерность модели
+
+SEQ_LEN = 100       # длина входной последовательности
+PRED_LEN = 30      # сколько шагов предсказывать
+MODEL_DIM = 8  # размерность модели
 NUM_HEADS = 4   # количество голов в Multi-Head Attention
 NUM_LAYERS = 2  # количество слоев трансформера
-BATCH_SIZE = 32 # размер батча
-EPOCHS = 50    # количество эпох
-LR = 1e-3    # скорость обучения
 CSV_PATH = "data.csv"  # файл с колонками [time, value]
+
+BATCH_SIZE = 256 # размер батча
+EPOCHS = 10    # количество эпох
+LR = 1e-4    # скорость обучения
+
 
 # === Позиционное кодирование ===
 class PositionalEncoding(nn.Module):
@@ -56,10 +56,13 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        self.pe = pe.unsqueeze(0)
+        self.pe = pe.unsqueeze(1)  # <--- ВАЖНО
 
     def forward(self, x):
-        return x + self.pe[:, :x.size(1)].to(x.device)
+        # x: [seq_len, batch, d_model]
+        x = x + self.pe[:x.size(0), :, :].to(x.device)
+        return x
+    
 
 # === Модель трансформера ===
 class TimeSeriesTransformer(nn.Module):
@@ -104,8 +107,10 @@ def train(model, windows):
             batch = windows[i:i+BATCH_SIZE]
             if len(batch) < BATCH_SIZE:
                 continue
-            inputs = torch.stack([w[0] for w in batch]).transpose(0, 1)
-            targets = torch.stack([w[1] for w in batch]).transpose(0, 1)
+            inputs = torch.stack([w[0] for w in batch])  # [batch, seq_len, 1]
+            targets = torch.stack([w[1] for w in batch]) # [batch, seq_len, 1]
+            inputs = inputs.transpose(0, 1)  # [seq_len, batch, 1]
+            targets = targets.transpose(0, 1)
 
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -121,19 +126,6 @@ def train(model, windows):
         startTime = curTime
         
 
-# === Прогноз ===
-def predict(model, known_seq, pred_len):
-    model.eval()
-    seq = known_seq.clone().unsqueeze(0).transpose(0, 1)  # [seq_len, 1, 1]
-    preds = []
-    with torch.no_grad():
-        for _ in range(pred_len):
-            out = model(seq)
-            next_val = out[-1, 0, 0]
-            preds.append(next_val.item())
-            seq = torch.cat([seq, next_val.view(1, 1, 1)], dim=0)[-SEQ_LEN:]
-    return preds
-
 # === Главный блок ===
 if __name__ == "__main__":
     print("Using device:", torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
@@ -147,17 +139,6 @@ if __name__ == "__main__":
     train(model, windows)
     print("Training completed.")
 
-    # Прогноз на основе последних SEQ_LEN значений
-    known = series[-SEQ_LEN:]
-    predicted = predict(model, known, PRED_LEN)
-    print ("Known values:", known.numpy())
-    print ("Predicted values:", predicted)
-    # Визуализация
-    # plt.plot(range(SEQ_LEN), known.numpy(), label="Known")
-    # plt.plot(range(SEQ_LEN, SEQ_LEN + PRED_LEN), predicted, label="Predicted")
-    # plt.legend()
-    # plt.title("Currency Forecast")
-    # plt.show()
-
+    torch.save(model.state_dict(), "model.pth")
 
 

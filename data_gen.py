@@ -9,11 +9,11 @@ def generate_sin2(num_samples, amplitude=8, frequency=1):
     return X, Y
 
 # Параметры
-NUM_SAMPLES = 10000
+NUM_SAMPLES = 1000
 
 X, Y = generate_sin2(NUM_SAMPLES)
 
-f = open("data.csv", "w+") 
+f = open("data2.csv", "w+") 
 for i in range(len(X)):
     f.write(str(X[i])+", " + str(Y[i]) + "\n")
 f.close()
