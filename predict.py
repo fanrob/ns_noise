@@ -11,9 +11,9 @@ print("")
 
 
 # === Параметры ===
-SEQ_LEN = 200       # длина входной последовательности
-PRED_LEN = 100      # сколько шагов предсказывать
-MODEL_DIM = 8  # размерность модели
+SEQ_LEN = 40       # длина входной последовательности
+PRED_LEN = 20      # сколько шагов предсказывать
+MODEL_DIM = 32  # размерность модели
 NUM_HEADS = 4   # количество голов в Multi-Head Attention
 NUM_LAYERS = 2  # количество слоев трансформера
 CSV_PATH = "data.csv"  # файл с колонками [time, value]
@@ -89,21 +89,28 @@ if __name__ == "__main__":
     print("Model initialized.")
 
     # Прогноз на основе последних SEQ_LEN значений
-    known = series[-SEQ_LEN:] 
+    point = -14
+    d = series[point-SEQ_LEN*9:point-SEQ_LEN]  * std + mean
+    known = series[point-SEQ_LEN:point] 
+    
+    k = known * std + mean
     predicted2 = predict(model, known, PRED_LEN)
     predicted = [p * std + mean for p in predicted2]
 
-    k = known * std + mean
+
+    
     print ("Known values:", k)
     print ("Predicted values:", predicted)
     
     # Визуализация
     
     plt.figure(figsize=(10, 5))
+    # Ранние значения
+    plt.plot(range(SEQ_LEN*8), d, label="Full data", color="green")
     # Известные значения (синим)
-    plt.plot(range(SEQ_LEN), k, label="Known", color="blue")
+    plt.plot(range(SEQ_LEN*8,SEQ_LEN*9), k, label="Known", color="blue")
     # Предсказанные значения (оранжевым)
-    plt.plot(range(SEQ_LEN, SEQ_LEN + PRED_LEN), predicted, label="Predicted", color="orange")
+    plt.plot(range(SEQ_LEN*9, SEQ_LEN*9 + PRED_LEN), predicted, label="Predicted", color="orange")
     plt.legend()
     plt.title("Currency Forecast")
     plt.xlabel("Time step")
