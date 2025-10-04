@@ -1,33 +1,13 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+
 import math
 
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
-
-# Загрузка данных из CSV
-# def load_data(file_path):
-#     data = open(file_path, 'r')
-
-#     X, Y = [], []
-#     for s in data:
-#         x, y = s.strip().split(',')
-#         X.append(float(x))
-#         Y.append(float(y))
-        
-#     data.close()
-#     return X,Y
-
-# # Параметры
-# SEQ_LEN = 30        # Длина входной последовательности
-# PRED_LEN = 5        # Длина предсказания
-# NUM_SAMPLES = 1000  # Количество обучающих примеров
-# BATCH_SIZE = 32     # Размер батча
-# EPOCHS = 50         # Количество эпох
-# DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-# print("Using " + DEVICE)
-#X,Y = load_data("data.csv")
 
 print("--------------------------------------------------------------")
 print("")
@@ -35,16 +15,16 @@ print("")
 
 # === Параметры ===
 
-SEQ_LEN = 40       # длина входной последовательности
+SEQ_LEN = 120       # длина входной последовательности
 PRED_LEN = 20      # сколько шагов предсказывать
-MODEL_DIM = 32  # размерность модели
-NUM_HEADS = 4   # количество голов в Multi-Head Attention
-NUM_LAYERS = 2  # количество слоев трансформера
+MODEL_DIM = 64  # размерность модели
+NUM_HEADS = 8   # количество голов в Multi-Head Attention
+NUM_LAYERS = 3  # количество слоев трансформера
 CSV_PATH = "data.csv"  # файл с колонками [time, value]
 
-BATCH_SIZE = 256 # размер батча
-EPOCHS = 80    # количество эпох
-LR = 1e-3    # скорость обучения
+BATCH_SIZE = 128  # размер батча
+EPOCHS = 20    # количество эпох
+LR = 5e-4    # скорость обучения
 
 
 # === Позиционное кодирование ===
@@ -80,6 +60,10 @@ class TimeSeriesTransformer(nn.Module):
         src = self.transformer_encoder(src)
         return self.output_proj(src)
 
+
+
+
+
 # === Загрузка и нормализация данных ===
 def load_series(csv_path):
     df = pd.read_csv(csv_path)
@@ -99,7 +83,9 @@ def create_windows(series, seq_len, pred_len):
 # === Обучение ===
 def train(model, windows):
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    criterion = nn.MSELoss()
+    #criterion = nn.MSELoss()
+    #criterion = nn.L1Loss()
+    criterion = nn.SmoothL1Loss(beta=0.5)
     startTime = time.time()
     for epoch in range(EPOCHS):
         batch_losses = []
@@ -114,6 +100,7 @@ def train(model, windows):
 
             outputs = model(inputs)
             loss = criterion(outputs, targets)
+            
 
             optimizer.zero_grad()
             loss.backward()

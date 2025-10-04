@@ -11,13 +11,16 @@ print("")
 
 
 # === Параметры ===
-SEQ_LEN = 40       # длина входной последовательности
+SEQ_LEN = 120       # длина входной последовательности
 PRED_LEN = 20      # сколько шагов предсказывать
-MODEL_DIM = 32  # размерность модели
-NUM_HEADS = 4   # количество голов в Multi-Head Attention
-NUM_LAYERS = 2  # количество слоев трансформера
+MODEL_DIM = 64  # размерность модели
+NUM_HEADS = 8   # количество голов в Multi-Head Attention
+NUM_LAYERS = 3  # количество слоев трансформера
+
+
 CSV_PATH = "data.csv"  # файл с колонками [time, value]
 
+END_POINT = -230 #конечная позиция входных данных со знаком -
 # === Позиционное кодирование ===
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
@@ -89,33 +92,41 @@ if __name__ == "__main__":
     print("Model initialized.")
 
     # Прогноз на основе последних SEQ_LEN значений
-    point = -14
-    d = series[point-SEQ_LEN*9:point-SEQ_LEN]  * std + mean
-    known = series[point-SEQ_LEN:point] 
+    point = END_POINT
+    known = series[point-SEQ_LEN*2:point-SEQ_LEN]       # предпоследний кусочек длиной SEQ_LEN - 
+    predicted_raw = predict(model, known, PRED_LEN)     # предсказываем !!!
     
-    k = known * std + mean
-    predicted2 = predict(model, known, PRED_LEN)
-    predicted = [p * std + mean for p in predicted2]
-
+    #приведение к оригинальному масштабу
+    h = series[point-SEQ_LEN*8:point]  * std + mean     # исторические данные
+    k = known * std + mean                              # это шло на вход нейронки
+    p = [pr * std + mean for pr in predicted_raw]       # предсказанные данные
 
     
+
     print ("Known values:", k)
-    print ("Predicted values:", predicted)
+    print ("Predicted values:", p)
     
     # Визуализация
     
     plt.figure(figsize=(10, 5))
-    # Ранние значения
-    plt.plot(range(SEQ_LEN*8), d, label="Full data", color="green")
-    # Известные значения (синим)
-    plt.plot(range(SEQ_LEN*8,SEQ_LEN*9), k, label="Known", color="blue")
-    # Предсказанные значения (оранжевым)
-    plt.plot(range(SEQ_LEN*9, SEQ_LEN*9 + PRED_LEN), predicted, label="Predicted", color="orange")
+
+    # Исторические данные — от начала
+    plt.plot(range(len(h)), h, label="Исторические данные", color="black", linewidth=1)
+
+    # Входные данные — начинаются после h[-SEQ_LEN*2:]
+    offset_k = len(h) - SEQ_LEN*2
+    plt.plot(range(offset_k, offset_k + SEQ_LEN), k, label="Входные данные", color="blue", linewidth=1)
+
+    # Предсказания — начинаются после входных
+    offset_p = offset_k + SEQ_LEN
+    plt.plot(range(offset_p, offset_p + PRED_LEN), p, label="Предсказания модели", color="orange", linewidth=1)
+
     plt.legend()
     plt.title("Currency Forecast")
     plt.xlabel("Time step")
     plt.ylabel("Value")
     plt.grid(True)
+    plt.tight_layout()
     plt.show()
 
 
