@@ -27,6 +27,14 @@ def generate_varfreq_sin(num_samples, amplitude=8, freq_start=1.0, freq_end=5.0)
         Y.append(v)
     return X, Y
 
+def generate_lineal(num_samples, start_val=0, end_val=100):
+    X, Y = [], []
+    for k in range(num_samples):
+        progress = k / num_samples
+        v = start_val + (end_val - start_val) * progress
+        X.append(k)
+        Y.append(v)
+    return X, Y
 
 def generate_pila(num_samples, amplitude=8, freq_start=1.0, freq_end=5.0):
     X, Y = [], []
@@ -117,11 +125,11 @@ NUM_SAMPLES = 1000
 #X, Y = generate_pila(num_samples=NUM_SAMPLES,freq_start=10, freq_end=40)
 #X, Y = generate_square_wave(num_samples=NUM_SAMPLES,amp_min=4, amp_max=4, freq_min=20, freq_max=20)
 X, Y = generate_real_data(NUM_SAMPLES,"eth_minute_data_rost.csv",2000)
-
+#X, Y = generate_lineal(num_samples=NUM_SAMPLES, start_val=0, end_val=100)  - очень слабо предсказывает
 
 #Y2 = add_noise(Y, noise_level=0.1)
 
-f = open("data-x.csv", "w+") 
+f = open("data.csv", "w+") 
 f.write("time,value\n")
 for i in range(len(X)):
     f.write(str(X[i])+", " + str(Y[i]) + "\n")
