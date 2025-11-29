@@ -3,6 +3,7 @@ import random
 import csv
 import time
 from datetime import datetime
+import numpy as np
 
 #простая синусоида
 def generate_sin2(num_samples, amplitude=8, frequency=1):
@@ -113,21 +114,94 @@ def generate_real_data(num_samples, file_name, start_pos):
     return timestamps, closes
 
 
+def generate_test_data(total_length, num_patterns, file_names, repetitions, intersections=False):
+    """
+    Генерация тестовых данных с паттернами.
 
+    Аргументы:
+    - total_length: длина итоговых массивов X и Y
+    - num_patterns: количество паттернов (от 1 до 8)
+    - file_names: список имён файлов с паттернами
+    - repetitions: сколько раз вставлять каждый паттерн
+    - intersections: допустимы ли пересечения
+
+    Возвращает:
+    - X: массив индексов [0..total_length-1]
+    - Y: массив данных с паттернами и константой
+    """
+
+    assert num_patterns <= len(file_names), "Недостаточно файлов для указанного числа паттернов"
+    assert num_patterns <= 8, "Максимум 8 паттернов"
+
+    # Загружаем паттерны
+    patterns = []
+    for fname in file_names[:num_patterns]:
+        pat = np.loadtxt(fname)  # допустим, паттерн хранится в текстовом файле
+        print(f"Загружен паттерн из {fname}, длина = {len(pat)}")
+        patterns.append(pat)
+
+    # X — просто индексы
+    X = np.arange(total_length)
+
+    # Y — заполняем случайной константой
+    base_value = random.uniform(50, 100)
+    Y = np.full(total_length, base_value)
+
+    if not intersections:
+        # Считаем общую длину всех вставок
+        total_insert_len = sum(len(pat) for pat in patterns) * repetitions
+        if total_insert_len > total_length:
+            raise ValueError("Невозможно разместить паттерны без пересечений: слишком мало места")
+
+    # Список занятых интервалов
+    occupied = []
+
+    # Вставляем паттерны
+    for pat in patterns:
+        pat_len = len(pat)
+        for _ in range(repetitions):
+            # ищем свободное место
+            placed = False
+            for _ in range(1000):  # ограничение на количество попыток
+                pos = random.randint(0, total_length-1)
+                interval = (pos, pos + pat_len)
+                
+                #проверка, чтобы паттерн не выходил за границы = если выходит, то обрезать паттерн
+                if pos + pat_len > total_length:
+                    pat = pat[:total_length - pos]
+                    pat_len = len(pat)
+                    print(f"Обрезан паттерн до длины {pat_len} для позиции {pos}")
+
+                # проверяем пересечения, если запрещены
+                if intersections or all(not (pos < end and pos+pat_len > start) for start, end in occupied):
+                    Y[pos:pos+pat_len] = pat
+                    occupied.append(interval)
+                    placed = True
+                    break
+            if not placed:
+                raise ValueError("Не удалось разместить паттерны без пересечений")
+
+    return X, Y
 
 
 
 # Параметры
-NUM_SAMPLES = 1000
+NUM_SAMPLES = 2000
 
 #X, Y = generate_sin2(num_samples=NUM_SAMPLES,frequency=5)
 #X, Y = generate_varfreq_sin(num_samples=NUM_SAMPLES,freq_start=10, freq_end=50)
 #X, Y = generate_pila(num_samples=NUM_SAMPLES,freq_start=10, freq_end=40)
 #X, Y = generate_square_wave(num_samples=NUM_SAMPLES,amp_min=4, amp_max=4, freq_min=20, freq_max=20)
-X, Y = generate_real_data(NUM_SAMPLES,"eth_minute_data_rost.csv",2000)
 #X, Y = generate_lineal(num_samples=NUM_SAMPLES, start_val=0, end_val=100)  - очень слабо предсказывает
+#X, Y = generate_real_data(NUM_SAMPLES,"eth_minute_data_rost.csv",100)
 
-#Y2 = add_noise(Y, noise_level=0.1)
+X, Y = generate_test_data(total_length=NUM_SAMPLES,
+                          num_patterns=1,
+                          file_names=["pattern1.txt"],
+                          repetitions=100,
+                          intersections=False)
+
+#Y = add_noise(Y, noise_level=0.1)
 
 f = open("data.csv", "w+") 
 f.write("time,value\n")

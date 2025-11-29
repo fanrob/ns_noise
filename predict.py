@@ -1,22 +1,26 @@
 import torch
 import matplotlib.pyplot as plt
 import ns
-from matplotlib.widgets import Slider
 
 print("--------------------------------------------------------------")
 print("")
 
 
 # === Параметры ===
+
+
 SEQ_LEN = 120       # длина входной последовательности
-PRED_LEN = 20      # сколько шагов предсказывать
+PRED_LEN = 5      # сколько шагов предсказывать
 MODEL_DIM = 64  # размерность модели
-NUM_HEADS = 8   # количество голов в Multi-Head Attention
-NUM_LAYERS = 3  # количество слоев трансформера
-
-
+NUM_HEADS = 4   # количество голов в Multi-Head Attention
+NUM_LAYERS = 4  # количество слоев трансформера
 CSV_PATH = "data.csv"  # файл с колонками [time, value]
 
+BATCH_SIZE = 256  # размер батча
+EPOCHS = 5    # количество эпох
+LR = 5e-2    # скорость обучения
+     
+     
 END_POINT = -130 #конечная позиция входных данных со знаком -
 
 

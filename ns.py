@@ -9,32 +9,6 @@ import time
 
 
 
-# === Загрузка и нормализация данных ===
-
-def load_series(csv_path):
-    df = pd.read_csv(csv_path)
-    values = torch.tensor(df["value"].values, dtype=torch.float32)
-    mean = values.mean().item()
-    std = values.std().item()
-    normed = (values - mean) / std
-    return normed, mean, std
-
-def load_series_2(csv_path):
-    df = pd.read_csv(csv_path)
-    values = torch.tensor(df["value"].values, dtype=torch.float32)
-    values = (values - values.mean()) / values.std()  # нормализация
-    return values
-
-# === Нарезка окон ===
-def create_windows(series, seq_len, pred_len):
-    windows = []
-    for i in range(len(series) - seq_len - pred_len):
-        input_seq = series[i:i+seq_len]
-        target_seq = series[i+1:i+seq_len+1]
-        windows.append((input_seq.unsqueeze(-1), target_seq.unsqueeze(-1)))
-    return windows
-
-
 
 
 
@@ -77,6 +51,8 @@ class TransformerEncoderLayerWithAttn(nn.Module):
         if need_weights:
             return src, attn_weights
         return src
+
+
 
 # === Модель трансформера ===
 class TimeSeriesTransformer(nn.Module):
@@ -187,10 +163,41 @@ class MultiheadAttentionWithHeads(nn.MultiheadAttention):
         else:
             return attn_output, None
 
-# === Обучение ===
-def train(model, windows, lambda_grad=0.5, epochs=20, batch_size=128, lr=5e-4):
-    optimizer = torch.optim.Adam(model.parameters(), lr)
-    base_loss = nn.SmoothL1Loss(beta=0.5)  # Huber Loss
+
+
+
+# === Загрузка и нормализация данных ===
+def load_series(csv_path):
+    df = pd.read_csv(csv_path)
+    values = torch.tensor(df["value"].values, dtype=torch.float32)
+    mean = values.mean().item()
+    std = values.std().item()
+    normed = (values - mean) / std
+    return normed, mean, std
+
+def load_series_2(csv_path):
+    df = pd.read_csv(csv_path)
+    values = torch.tensor(df["value"].values, dtype=torch.float32)
+    values = (values - values.mean()) / values.std()  # нормализация
+    return values
+
+# === Нарезка окон ===
+def create_windows(series, seq_len, pred_len):
+    windows = []
+    for i in range(len(series) - seq_len - pred_len):
+        input_seq = series[i:i+seq_len]
+        target_seq = series[i+1:i+seq_len+1]
+        windows.append((input_seq.unsqueeze(-1), target_seq.unsqueeze(-1)))
+    return windows
+
+
+# === Обучение
+def train(model, windows, optimizer=None, lambda_grad=0.5, epochs=20, batch_size=128, lr=5e-4):
+    # Если оптимизатор не передан — создаём новый
+    if optimizer is None:
+        optimizer = torch.optim.Adam(model.parameters(), lr)
+
+    base_loss = nn.SmoothL1Loss(beta=0.1)  # Huber Loss
 
     startTime = time.time()
     for epoch in range(epochs):
@@ -210,22 +217,25 @@ def train(model, windows, lambda_grad=0.5, epochs=20, batch_size=128, lr=5e-4):
             # Основной loss
             loss_main = base_loss(outputs, targets)
 
-            # Градиентный штраф (разность между соседними значениями)
-            diff_outputs = outputs[1:] - outputs[:-1]
-            diff_targets = targets[1:] - targets[:-1]
-            loss_grad = nn.L1Loss()(diff_outputs, diff_targets)
+            # Градиентный штраф (если нужен)
+            # diff_outputs = outputs[1:] - outputs[:-1]
+            # diff_targets = targets[1:] - targets[:-1]
+            # loss_grad = nn.L1Loss()(diff_outputs, diff_targets)
 
             # Общий loss
-            loss = loss_main + lambda_grad * loss_grad
+            loss = loss_main # + lambda_grad * loss_grad
 
             optimizer.zero_grad()
-            loss.backward()
+
+            loss.backward() 
             optimizer.step()
             batch_losses.append(loss.item())
 
         curTime = time.time()
         print(f"Epoch {epoch}, Time: {curTime - startTime:.2f}s, Loss: {sum(batch_losses)/len(batch_losses):.4f}")
         startTime = curTime
+
+    return optimizer  # возвращаем оптимизатор, чтобы использовать дальше
 
 
 # === Прогноз ===
