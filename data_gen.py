@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 import numpy as np
 
+
 #простая синусоида
 def generate_sin2(num_samples, amplitude=8, frequency=1):
     X, Y = [], []
@@ -144,7 +145,7 @@ def generate_test_data(total_length, num_patterns, file_names, repetitions, inte
     X = np.arange(total_length)
 
     # Y — заполняем случайной константой
-    base_value = random.uniform(50, 100)
+    base_value = 140 #random.uniform(50, 100)
     Y = np.full(total_length, base_value)
 
     if not intersections:
@@ -185,23 +186,104 @@ def generate_test_data(total_length, num_patterns, file_names, repetitions, inte
 
 
 
+def generate_crypto_like(length,
+                         start_price=100,
+                         max_trend=2,
+                         max_trend_len=100,
+                         max_jump=100,
+                         num_jumps=5,
+                         bounce1=0,
+                         bounce2=0,
+                         prebounce1=5,
+                         prebounce2=10,
+                         bounce_len=3):
+    series = [start_price]
+    pos = 0
+    
+    # --- карта скачков (случайные позиции) ---
+    jump_positions = sorted(random.sample(range(20, length-50), num_jumps))
+    
+    while len(series) < length:
+        # --- тренд ---
+        trend_len = random.randint(20, max_trend_len)
+        slope = random.uniform(-max_trend, max_trend)
+        
+        for _ in range(trend_len):
+            if len(series) >= length:
+                break
+            series.append(series[-1] + slope)
+            pos += 1
+            
+            # --- проверяем скачки ---
+            if pos in jump_positions:
+                
+
+                jump = random.uniform(-max_jump, max_jump)
+                # предотскоки
+                base = series[-1]
+                for b in [ prebounce1, prebounce2]:
+                    b = b * jump / max_jump
+                    for i in range(bounce_len):
+                        if len(series) >= length:
+                            break
+                        k= math.pi*2/bounce_len*i
+                        k2=math.sin(k) 
+                        series.append(base + b * k2)
+                        pos += 1
+                
+                
+                series[-1] += jump
+                
+                # отскоки
+                for b in [ -bounce1, +bounce1, -bounce2, +bounce2 ]:
+                    for _ in range(bounce_len):
+                        if len(series) >= length:
+                            break
+                        b = b * abs(jump) / max_jump
+                        series.append(series[-1] + b / bounce_len)
+                        pos += 1
+    
+    # --- формат выхода ---
+    X = np.arange(len(series[:length]))
+    Y = np.array(series[:length])
+    return X, Y
+
+
+
 # Параметры
-NUM_SAMPLES = 2000
+NUM_SAMPLES = 1000
+#random.seed(67) # для воспроизводимости
+
 
 #X, Y = generate_sin2(num_samples=NUM_SAMPLES,frequency=5)
 #X, Y = generate_varfreq_sin(num_samples=NUM_SAMPLES,freq_start=10, freq_end=50)
 #X, Y = generate_pila(num_samples=NUM_SAMPLES,freq_start=10, freq_end=40)
 #X, Y = generate_square_wave(num_samples=NUM_SAMPLES,amp_min=4, amp_max=4, freq_min=20, freq_max=20)
-#X, Y = generate_lineal(num_samples=NUM_SAMPLES, start_val=0, end_val=100)  - очень слабо предсказывает
-#X, Y = generate_real_data(NUM_SAMPLES,"eth_minute_data_rost.csv",100)
+#X, Y = generate_lineal(num_samples=NUM_SAMPLES, start_val=10, end_val=130) 
+# X, Y = generate_real_data(NUM_SAMPLES,"eth_minute_data_rost.csv",0)
 
-X, Y = generate_test_data(total_length=NUM_SAMPLES,
-                          num_patterns=1,
-                          file_names=["pattern1.txt"],
-                          repetitions=100,
-                          intersections=False)
+#X, Y = generate_test_data(total_length=NUM_SAMPLES,
+#                            num_patterns=1,
+#                            file_names=["pattern3.txt", "pattern1.txt", "pattern3.txt", "pattern4.txt"],
+#                            repetitions=20,
+#                            intersections=False)
 
-#Y = add_noise(Y, noise_level=0.1)
+
+
+X, Y = generate_crypto_like(length=NUM_SAMPLES,
+                         start_price=2000,
+                         max_trend=0.2,
+                         max_trend_len=400,
+                         max_jump=100,
+                         num_jumps=8,
+                         bounce1=0,
+                         bounce2=0,
+                         prebounce1=10,
+                         prebounce2=30,
+                         bounce_len=20)
+
+
+#Y = add_noise(Y, noise_level=0.9)
 
 f = open("data.csv", "w+") 
 f.write("time,value\n")

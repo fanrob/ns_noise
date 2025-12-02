@@ -1,6 +1,8 @@
 import torch
 import matplotlib.pyplot as plt
 import ns
+import numpy as np
+from constns import *
 
 print("--------------------------------------------------------------")
 print("")
@@ -8,21 +10,8 @@ print("")
 
 # === Параметры ===
 
-
-SEQ_LEN = 120       # длина входной последовательности
-PRED_LEN = 5      # сколько шагов предсказывать
-MODEL_DIM = 64  # размерность модели
-NUM_HEADS = 4   # количество голов в Multi-Head Attention
-NUM_LAYERS = 4  # количество слоев трансформера
-CSV_PATH = "data.csv"  # файл с колонками [time, value]
-
-BATCH_SIZE = 256  # размер батча
-EPOCHS = 5    # количество эпох
-LR = 5e-2    # скорость обучения
-     
-     
-END_POINT = -130 #конечная позиция входных данных со знаком -
-
+START_POINT = 0  #начальная позиция входных данных
+WINDOW = 1000 # какой кусок данных берем для рисунка графика и предсказания
 
 
 # === Главный блок ===
@@ -32,50 +21,51 @@ if __name__ == "__main__":
     series, mean, std = ns.load_series(CSV_PATH)
 
     
-    print(f"Loaded series of length {len(series)}")
+    print(f"Loaded series of length {len(series)}") 
     
     model = ns.TimeSeriesTransformerWithAttn(input_dim=1, model_dim=MODEL_DIM, num_heads=NUM_HEADS,
                              num_layers=NUM_LAYERS, output_dim=1)
     model.load_state_dict(torch.load("model.pth"))
-    model.eval()  # если только для инференса
+    model.eval()
     print("Model initialized.")
   
     # Прогноз на основе последних SEQ_LEN значений
-    point = END_POINT
-    known = series[point-SEQ_LEN*2:point-SEQ_LEN]       # предпоследний кусочек длиной SEQ_LEN - 
-    predicted_raw = ns.predict(model, known, PRED_LEN)     # предсказываем !!!
-    
-    #приведение к оригинальному масштабу
-    h = series[point-SEQ_LEN*8:point]  * std + mean     # исторические данные
-    k = known * std + mean                              # это шло на вход нейронки
-    p = [pr * std + mean for pr in predicted_raw]       # предсказанные данные
+    graph1 = series[START_POINT:START_POINT+WINDOW]  # исторические данные для графика
+    graph2 = graph1.clone()   # предсказанные данные для графика
 
-    
+    for i in range(0,WINDOW-SEQ_LEN-PRED_LEN,PRED_LEN):
+        known = graph1[i:i+SEQ_LEN]       
+        #predict = torch.tensor(ns.predict(model, known, PRED_LEN))     # предсказываем !!!
+        predict = torch.tensor(ns.predict_block(model, known, PRED_LEN))     # предсказываем !!!
+        graph2[i+SEQ_LEN:i+SEQ_LEN+PRED_LEN] = predict  # сохраняем в график предсказаний
+      
+    graph1 = graph1.numpy() * std + mean  # денормализация
+    graph2 = graph2.numpy() * std + mean  # денормализация
+        
+   
 
-    print ("Known values:", k)
-    print ("Predicted values:", p)
-    
-    # Визуализация
-    
-    plt.figure(figsize=(10, 5))
+# Включаем тёмный стиль
+plt.style.use("dark_background")
 
-    # Исторические данные — от начала
-    plt.plot(range(len(h)), h, label="Исторические данные", color="black", linewidth=1)
+# Визуализация
+plt.figure(figsize=(10, 5))
 
-    # Входные данные — начинаются после h[-SEQ_LEN*2:]
-    offset_k = len(h) - SEQ_LEN*2
-    plt.plot(range(offset_k, offset_k + SEQ_LEN), k, label="Входные данные", color="blue", linewidth=1)
+# Исторические данные
+plt.plot(range(len(graph1)), graph1, label="Исторические данные", color="cyan", linewidth=1)
 
-    # Предсказания — начинаются после входных
-    offset_p = offset_k + SEQ_LEN
-    plt.plot(range(offset_p, offset_p + PRED_LEN), p, label="Предсказания модели", color="orange", linewidth=1)
+# Предсказания
+plt.plot(range(len(graph2)), graph2, label="Предсказания модели", color="orange", linewidth=1)
 
-    plt.legend()
-    plt.title("Currency Forecast")
-    plt.xlabel("Time step")
-    plt.ylabel("Value")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
 
-    
+
+# Настройки
+plt.legend(facecolor="black", edgecolor="white")
+plt.title("Currency Forecast", color="white")
+plt.xlabel("Time step", color="white")
+plt.ylabel("Value", color="white")
+step = 50
+plt.xticks(np.arange(0, len(graph1), step))
+plt.grid(True, color="gray", alpha=0.3)
+plt.tight_layout()
+plt.show()
+

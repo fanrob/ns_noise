@@ -6,6 +6,8 @@ import pandas as pd
 import time
 
 
+from constns import *
+
 
 
 
@@ -181,27 +183,24 @@ def load_series_2(csv_path):
     values = (values - values.mean()) / values.std()  # нормализация
     return values
 
-# === Нарезка окон ===
-def create_windows(series, seq_len, pred_len):
-    windows = []
-    for i in range(len(series) - seq_len - pred_len):
-        input_seq = series[i:i+seq_len]
-        target_seq = series[i+1:i+seq_len+1]
-        windows.append((input_seq.unsqueeze(-1), target_seq.unsqueeze(-1)))
-    return windows
+
+
 
 
 # === Обучение
-def train(model, windows, optimizer=None, lambda_grad=0.5, epochs=20, batch_size=128, lr=5e-4):
+def train(model, windows, optimizer=None, beta=0.5, epochs=20, batch_size=128, lr=5e-4, device = torch.device('cpu')):
     # Если оптимизатор не передан — создаём новый
     if optimizer is None:
         optimizer = torch.optim.Adam(model.parameters(), lr)
 
-    base_loss = nn.SmoothL1Loss(beta=0.1)  # Huber Loss
-
+    
+    base_loss = nn.MSELoss()
+    t_beta = beta
     startTime = time.time()
     for epoch in range(epochs):
         batch_losses = []
+    #    base_loss = nn.SmoothL1Loss(beta=t_beta)  # Huber Loss
+
         for i in range(0, len(windows), batch_size):
             batch = windows[i:i+batch_size]
             if len(batch) < batch_size:
@@ -209,31 +208,24 @@ def train(model, windows, optimizer=None, lambda_grad=0.5, epochs=20, batch_size
 
             inputs = torch.stack([w[0] for w in batch])  # [batch, seq_len, 1]
             targets = torch.stack([w[1] for w in batch]) # [batch, seq_len, 1]
-            inputs = inputs.transpose(0, 1)              # [seq_len, batch, 1]
-            targets = targets.transpose(0, 1)
+
+            # переносим на GPU
+            inputs = inputs.transpose(0, 1).to(device)
+            targets = targets.transpose(0, 1).to(device)
 
             outputs = model(inputs)                      # [seq_len, batch, 1]
 
-            # Основной loss
-            loss_main = base_loss(outputs, targets)
-
-            # Градиентный штраф (если нужен)
-            # diff_outputs = outputs[1:] - outputs[:-1]
-            # diff_targets = targets[1:] - targets[:-1]
-            # loss_grad = nn.L1Loss()(diff_outputs, diff_targets)
-
-            # Общий loss
-            loss = loss_main # + lambda_grad * loss_grad
-
+            loss = base_loss(outputs, targets)
             optimizer.zero_grad()
-
-            loss.backward() 
+            loss.backward()
             optimizer.step()
             batch_losses.append(loss.item())
 
+
         curTime = time.time()
-        print(f"Epoch {epoch}, Time: {curTime - startTime:.2f}s, Loss: {sum(batch_losses)/len(batch_losses):.4f}")
+        print(f"Epoch {epoch}, Time: {curTime - startTime:.2f}s, Loss: {sum(batch_losses)/len(batch_losses):.4f}, Max Loss: {max(batch_losses):.4f} ")
         startTime = curTime
+        t_beta = (sum(batch_losses)+ max(batch_losses))/2/len(batch_losses)  # адаптивно меняем beta для Huber Loss
 
     return optimizer  # возвращаем оптимизатор, чтобы использовать дальше
 
@@ -252,6 +244,27 @@ def predict(model, known_seq, pred_len, seq_len=120):
             preds.append(next_val.item())
     return preds
 
+
+# === Прогноз сразу блоком ===
+def predict_block(model, known_seq, pred_len):
+    """
+    model      : обученная модель
+    known_seq  : torch.tensor([seq_len]) — известная последовательность
+    pred_len   : сколько точек предсказываем вперёд
+    
+    Возвращает массив из pred_len предсказанных значений.
+    """
+    model.eval()
+    # подготовка входа
+    seq = known_seq.clone().unsqueeze(0).unsqueeze(-1)  # [1, seq_len, 1]
+    seq = seq.transpose(0, 1)  # [seq_len, 1, 1]
+
+    with torch.no_grad():
+        out = model(seq)  # [seq_len, batch, dim]
+        # берём последние pred_len шагов
+        preds = out[-pred_len:, 0, 0].cpu().numpy()
+
+    return preds.tolist()
 
 
 
