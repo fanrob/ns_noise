@@ -11,10 +11,10 @@ print("")
 # === Параметры ===
 
 
-BATCH_SIZE = 100  # размер батча
+BATCH_SIZE = 20  # размер батча
 EPOCHS = 10    # количество эпох
 LR = 5e-5    # скорость обучения
-BETA = 0.1   # коэффициент для взвешивания потерь     
+BETA = 0.3   # коэффициент для взвешивания потерь     
 
 
 # === Нарезка окон ===
@@ -28,6 +28,19 @@ def create_windows(series, seq_len, pred_len):
     return windows
 
 
+from data_gen import generate_crypto_like
+def gen():
+    return generate_crypto_like(length=1000,
+                         start_price=2000,
+                         max_trend=0.2,
+                         max_trend_len=400,
+                         max_jump=100,
+                         num_jumps=5,
+                         bounce1=0,
+                         bounce2=0,
+                         prebounce1=10,
+                         prebounce2=30,
+                         bounce_len=30)
 
 
 # === Главный блок ===
@@ -43,6 +56,8 @@ if __name__ == "__main__":
     windows = create_windows(series, SEQ_LEN, PRED_LEN)
     model = ns.TimeSeriesTransformerWithAttn(input_dim=1, model_dim=MODEL_DIM, num_heads=NUM_HEADS,
                                   num_layers=NUM_LAYERS, output_dim=1)
+    #model = ns.TimeSeriesTransformer(input_dim=1, model_dim=MODEL_DIM, num_heads=NUM_HEADS,
+    #                              num_layers=NUM_LAYERS, output_dim=1)
     model.to(device)
     print("Model initialized.")
 
@@ -63,10 +78,12 @@ if __name__ == "__main__":
         optimizer.load_state_dict(checkpoint)
 
         print("Optimizer loaded.")
-        optimizer = ns.train(model, windows, optimizer=optimizer, epochs=EPOCHS, beta = BETA, batch_size=BATCH_SIZE, lr=LR, device=device)
+        optimizer = ns.train(model, windows, optimizer=optimizer, epochs=EPOCHS, beta = BETA, \
+                             batch_size=BATCH_SIZE, lr=LR, device=device)
     else:
         print("No optimizer file found, creating new optimizer.")
-        optimizer = ns.train(model, windows, epochs=EPOCHS, beta = BETA, batch_size=BATCH_SIZE, lr=LR, device=device)
+        optimizer = ns.train(model, windows, epochs=EPOCHS, beta = BETA, \
+                             batch_size=BATCH_SIZE, lr=LR, device=device)
     # сохранить optimizer в файл
     torch.save(optimizer.state_dict(), "optimizer.pth")
 

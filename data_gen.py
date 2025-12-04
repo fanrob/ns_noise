@@ -252,7 +252,7 @@ def generate_crypto_like(length,
 
 # Параметры
 NUM_SAMPLES = 1000
-#random.seed(67) # для воспроизводимости
+random.seed(10) # для воспроизводимости
 
 
 #X, Y = generate_sin2(num_samples=NUM_SAMPLES,frequency=5)
@@ -272,15 +272,15 @@ NUM_SAMPLES = 1000
 
 X, Y = generate_crypto_like(length=NUM_SAMPLES,
                          start_price=2000,
-                         max_trend=0.2,
+                         max_trend=0.3,
                          max_trend_len=400,
                          max_jump=100,
-                         num_jumps=8,
+                         num_jumps=0,
                          bounce1=0,
                          bounce2=0,
-                         prebounce1=10,
-                         prebounce2=30,
-                         bounce_len=20)
+                         prebounce1=0,
+                         prebounce2=0,
+                         bounce_len=30)
 
 
 #Y = add_noise(Y, noise_level=0.9)

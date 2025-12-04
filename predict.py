@@ -16,7 +16,6 @@ WINDOW = 1000 # какой кусок данных берем для рисун�
 
 # === Главный блок ===
 if __name__ == "__main__":
-    print("Using device:", torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
     # Загрузка и подготовка данных
     series, mean, std = ns.load_series(CSV_PATH)
 
